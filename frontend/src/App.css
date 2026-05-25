@@ -1,0 +1,28 @@
+.app-root {
+  background-image: radial-gradient(circle at top left, rgba(14, 165, 233, 0.08), transparent 22%), radial-gradient(circle at bottom right, rgba(14, 165, 233, 0.05), transparent 30%);
+}
+
+.shadow-glow {
+  box-shadow: 0 20px 80px rgba(15, 23, 42, 0.06);
+}
+
+@keyframes float-up {
+  from {
+    transform: translateY(20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.fade-in-up {
+  animation: float-up 0.9s ease-out both;
+}
+
+@media (max-width: 640px) {
+  .app-root {
+    background-image: none;
+  }
+}
