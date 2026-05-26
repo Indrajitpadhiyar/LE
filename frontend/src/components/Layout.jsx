@@ -3,17 +3,22 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ShoppingBag, Heart, X, 
   Trash2, Plus, Minus, CreditCard, ChevronRight,
-  Sparkles, ShieldCheck, Mail, ArrowUpRight
+  Sparkles, ShieldCheck, Mail, ArrowUpRight,
+  User, LogOut, LogIn
 } from 'lucide-react';
 import { useShop } from '../context/ShopContext';
+import { useAuth } from '../context/AuthContext';
 
 export default function Layout({ children }) {
   const { 
     activeView, navigateTo,
     cart, removeFromCart, updateCartQty,
     favorites, promoCode, promoDiscount, applyPromo, removePromo,
-    cartSubtotal, cartDiscountAmount, cartTax, cartShipping, cartTotal
+    cartSubtotal, cartDiscountAmount, cartTax, cartShipping, cartTotal,
+    addToast
   } = useShop();
+  const { user, isAuthenticated, isAdmin, logout } = useAuth();
+  const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
 
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -96,6 +101,65 @@ export default function Layout({ children }) {
               )}
             </motion.button>
 
+            {/* Auth: Login / User Profile */}
+            {isAuthenticated ? (
+              <div className="relative">
+                <motion.button
+                  whileTap={{ scale: 0.9 }}
+                  onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                  className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-slate-600 hover:border-cyan-300 shadow-sm transition-colors"
+                >
+                  <div className="w-5 h-5 rounded-full bg-gradient-to-br from-cyan-400 to-indigo-500 flex items-center justify-center">
+                    <span className="text-[10px] font-bold text-white">{user?.name?.[0]?.toUpperCase()}</span>
+                  </div>
+                  <span className="hidden sm:inline text-xs font-semibold truncate max-w-[80px]">{user?.name}</span>
+                </motion.button>
+                {/* Dropdown */}
+                <AnimatePresence>
+                  {isUserMenuOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute right-0 mt-2 w-52 bg-white rounded-2xl border border-slate-200 shadow-xl shadow-slate-200/40 py-2 z-50"
+                    >
+                      <div className="px-4 py-2.5 border-b border-slate-100">
+                        <p className="text-sm font-bold text-slate-800 truncate">{user?.name}</p>
+                        <p className="text-[11px] text-slate-400 truncate">{user?.email}</p>
+                        {isAdmin && <span className="inline-block mt-1 text-[9px] font-bold uppercase tracking-wider bg-violet-100 text-violet-600 px-2 py-0.5 rounded-full">Admin</span>}
+                      </div>
+                      {isAdmin && (
+                        <button
+                          onClick={() => { setIsUserMenuOpen(false); navigateTo('admin-dashboard'); }}
+                          className="w-full px-4 py-2.5 text-left text-sm text-slate-600 hover:bg-slate-50 flex items-center gap-2 transition-colors"
+                        >
+                          <ShieldCheck className="w-4 h-4 text-violet-500" />
+                          Admin Dashboard
+                        </button>
+                      )}
+                      <button
+                        onClick={() => { setIsUserMenuOpen(false); logout(); addToast('Logged out successfully', 'info'); navigateTo('login'); }}
+                        className="w-full px-4 py-2.5 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2 transition-colors"
+                      >
+                        <LogOut className="w-4 h-4" />
+                        Logout
+                      </button>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            ) : (
+              <motion.button
+                whileTap={{ scale: 0.9 }}
+                onClick={() => navigateTo('login')}
+                className="flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-600 hover:border-cyan-300 hover:text-cyan-600 shadow-sm transition-colors"
+              >
+                <LogIn className="h-4 w-4" />
+                <span className="hidden sm:inline text-xs">Login</span>
+              </motion.button>
+            )}
+
             {/* Cart Button */}
             <motion.button
               whileTap={{ scale: 0.95 }}
@@ -149,6 +213,42 @@ export default function Layout({ children }) {
                 >
                   Smart Systems
                 </button>
+                <div className="border-t border-slate-200 pt-3 mt-1">
+                  {isAuthenticated ? (
+                    <>
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="w-7 h-7 rounded-full bg-gradient-to-br from-cyan-400 to-indigo-500 flex items-center justify-center">
+                          <span className="text-[10px] font-bold text-white">{user?.name?.[0]?.toUpperCase()}</span>
+                        </div>
+                        <div>
+                          <p className="text-xs font-bold text-slate-800">{user?.name}</p>
+                          <p className="text-[10px] text-slate-400">{user?.email}</p>
+                        </div>
+                      </div>
+                      {isAdmin && (
+                        <button
+                          onClick={() => { navigateTo('admin-dashboard'); setIsMobileMenuOpen(false); }}
+                          className="text-left hover:text-violet-600 text-violet-500 flex items-center gap-2 mb-3"
+                        >
+                          <ShieldCheck className="w-4 h-4" /> Admin Dashboard
+                        </button>
+                      )}
+                      <button
+                        onClick={() => { logout(); addToast('Logged out', 'info'); navigateTo('login'); setIsMobileMenuOpen(false); }}
+                        className="text-left text-red-500 hover:text-red-600 flex items-center gap-2"
+                      >
+                        <LogOut className="w-4 h-4" /> Logout
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      onClick={() => { navigateTo('login'); setIsMobileMenuOpen(false); }}
+                      className="text-left text-cyan-600 hover:text-cyan-500 flex items-center gap-2"
+                    >
+                      <LogIn className="w-4 h-4" /> Login / Sign Up
+                    </button>
+                  )}
+                </div>
               </nav>
             </motion.div>
           )}
