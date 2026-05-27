@@ -2,6 +2,10 @@ import jwt from "jsonwebtoken";
 import User from "../model/User.js";
 import { config } from "../config/config.js";
 import { ApiError } from "../error/ApiError.js";
+import { OAuth2Client } from "google-auth-library";
+import crypto from "crypto";
+
+const googleClient = new OAuth2Client(config.GOOGLE_CLIENT_ID);
 
 /**
  * Generate JWT token
@@ -14,14 +18,13 @@ const generateToken = (user) => {
   );
 };
 
-/**
- * Format user response (strip sensitive fields)
- */
+
 const formatUserResponse = (user) => ({
   _id: user._id,
   name: user.name,
   email: user.email,
   role: user.role,
+  photo: user.photo,
   createdAt: user.createdAt,
 });
 
@@ -154,4 +157,91 @@ export const getMe = async (req, res, _next) => {
     success: true,
     user: formatUserResponse(req.user),
   });
+};
+
+/**
+ * @desc    Login/Register via Google OAuth
+ * @route   POST /api/auth/google-login
+ * @access  Public
+ */
+export const googleLogin = async (req, res, next) => {
+  try {
+    const { idToken } = req.body;
+
+    if (!idToken) {
+      throw new ApiError("Please provide Google ID Token", 400);
+    }
+
+    // Verify Google ID Token
+    let ticket;
+    try {
+      ticket = await googleClient.verifyIdToken({
+        idToken,
+        audience: config.GOOGLE_CLIENT_ID,
+      });
+    } catch (err) {
+      throw new ApiError("Invalid or expired Google Token", 401);
+    }
+
+    const payload = ticket.getPayload();
+    if (!payload) {
+      throw new ApiError("Failed to retrieve Google profile data", 400);
+    }
+
+    const { sub: googleId, email, name, picture } = payload;
+
+    if (!email) {
+      throw new ApiError("Google account must have an associated email address", 400);
+    }
+
+    // Find existing user by googleId or by email
+    let user = await User.findOne({
+      $or: [{ googleId }, { email }],
+    });
+
+    if (user) {
+      let isModified = false;
+      // If user exists but googleId isn't linked, link it
+      if (!user.googleId) {
+        user.googleId = googleId;
+        isModified = true;
+      }
+      // Set Google User flag
+      if (!user.isGoogleUser) {
+        user.isGoogleUser = true;
+        isModified = true;
+      }
+      // If user photo is default and Google picture is available, update it
+      if (picture && (!user.photo || user.photo === "default.jpg")) {
+        user.photo = picture;
+        isModified = true;
+      }
+      
+      if (isModified) {
+        await user.save();
+      }
+    } else {
+      // Create a new user with Google details and secure random password
+      const randomPassword = crypto.randomBytes(32).toString("hex");
+      user = await User.create({
+        name: name || "Google User",
+        email,
+        password: randomPassword,
+        googleId,
+        isGoogleUser: true,
+        photo: picture || "default.jpg",
+      });
+    }
+
+    // Generate JWT token for App Authentication
+    const token = generateToken(user);
+
+    res.status(200).json({
+      success: true,
+      token,
+      user: formatUserResponse(user),
+    });
+  } catch (error) {
+    next(error);
+  }
 };

@@ -1,6 +1,7 @@
 /* eslint-disable react-refresh/only-export-components */
 import { createContext, useContext, useState, useEffect } from 'react';
 import { products } from '../data/products';
+import { useAuth } from './AuthContext';
 
 // External helper to generate unique IDs and satisfy React Compiler purity rules
 function generateUniqueToastId() {
@@ -10,12 +11,17 @@ function generateUniqueToastId() {
 const ShopContext = createContext();
 
 export function ShopProvider({ children }) {
+  const { isAuthenticated } = useAuth();
+
   // Theme is permanently light — no dark mode
   const theme = 'light';
 
   // View routing state
   const [activeView, setActiveView] = useState('home');
   const [activeProductId, setActiveProductId] = useState(null);
+  
+  // Pending cart item for post-login redirect/add
+  const [pendingCartItem, setPendingCartItem] = useState(null);
 
   // E-commerce state
   const [cart, setCart] = useState(() => {
@@ -78,6 +84,13 @@ export function ShopProvider({ children }) {
 
   // Cart operations
   const addToCart = (product, quantity = 1, selectedSpecs = {}) => {
+    if (!isAuthenticated) {
+      setPendingCartItem({ product, quantity, selectedSpecs, activeView, activeProductId });
+      addToast('Please login to add products to your cart.', 'info');
+      navigateTo('login');
+      return;
+    }
+
     setCart(prevCart => {
       const existingIndex = prevCart.findIndex(item => 
         item.product.id === product.id && 
@@ -87,10 +100,10 @@ export function ShopProvider({ children }) {
       if (existingIndex > -1) {
         const newCart = [...prevCart];
         newCart[existingIndex].quantity += quantity;
-        addToast(`Added another ${product.name} to cart!`, 'success');
+        addToast(`Added another ${product.name} to cart successfully! 🎉`, 'success');
         return newCart;
       } else {
-        addToast(`${product.name} added to cart!`, 'success');
+        addToast(`${product.name} added to cart successfully! 🎉`, 'success');
         return [...prevCart, { product, quantity, selectedSpecs }];
       }
     });
@@ -167,7 +180,40 @@ export function ShopProvider({ children }) {
     if (productId) {
       setActiveProductId(productId);
     }
+    // Clear pending cart item if user navigates away from auth flow
+    if (view !== 'login' && view !== 'signup') {
+      setPendingCartItem(null);
+    }
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Post-login action: add pending item to cart and redirect back
+  const handlePostLoginRedirect = () => {
+    if (pendingCartItem) {
+      const { product, quantity, selectedSpecs, activeView: prevView, activeProductId: prevProductId } = pendingCartItem;
+      
+      setCart(prevCart => {
+        const existingIndex = prevCart.findIndex(item => 
+          item.product.id === product.id && 
+          JSON.stringify(item.selectedSpecs) === JSON.stringify(selectedSpecs)
+        );
+
+        if (existingIndex > -1) {
+          const newCart = [...prevCart];
+          newCart[existingIndex].quantity += quantity;
+          addToast(`Added another ${product.name} to cart successfully! 🎉`, 'success');
+          return newCart;
+        } else {
+          addToast(`${product.name} added to cart successfully! 🎉`, 'success');
+          return [...prevCart, { product, quantity, selectedSpecs }];
+        }
+      });
+
+      setPendingCartItem(null);
+      navigateTo(prevView || 'shop', prevProductId);
+    } else {
+      navigateTo('home');
+    }
   };
 
   // Helper values for calculations
@@ -211,7 +257,8 @@ export function ShopProvider({ children }) {
         cartShipping,
         cartTotal,
         lastOrder,
-        setLastOrder
+        setLastOrder,
+        handlePostLoginRedirect
       }}
     >
       {children}

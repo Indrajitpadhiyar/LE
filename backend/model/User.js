@@ -26,6 +26,15 @@ const userSchema = new mongoose.Schema(
       minlength: [6, "Password must be at least 6 characters"],
       select: false, // Don't return password by default in queries
     },
+    googleId: {
+      type: String,
+      unique: true,
+      sparse: true,
+    },
+    isGoogleUser: {
+      type: Boolean,
+      default: false,
+    },
     role: {
       type: String,
       enum: ["user", "admin"],

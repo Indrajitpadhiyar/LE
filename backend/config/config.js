@@ -1,5 +1,10 @@
 import dotenv from 'dotenv';
-dotenv.config();
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+dotenv.config({ path: join(__dirname, '..', '.env') });
 
 export const config = {
   PORT: process.env.PORT || 4000,
@@ -9,4 +14,5 @@ export const config = {
   ADMIN_EMAIL: process.env.ADMIN_EMAIL || 'admin@luckyelectrical.com',
   ADMIN_PASSWORD: process.env.ADMIN_PASSWORD || 'admin123',
   ADMIN_NAME: process.env.ADMIN_NAME || 'Admin',
+  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
 };

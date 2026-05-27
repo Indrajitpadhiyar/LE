@@ -74,6 +74,16 @@ export function AuthProvider({ children }) {
     return data;
   }, []);
 
+  // Google login
+  const googleLogin = useCallback(async (idToken) => {
+    const { data } = await api.post('/google-login', { idToken });
+    if (data.success) {
+      setToken(data.token);
+      setUser(data.user);
+    }
+    return data;
+  }, []);
+
   // Admin login
   const adminLogin = useCallback(async (email, password) => {
     const { data } = await api.post('/admin/login', { email, password });
@@ -101,6 +111,7 @@ export function AuthProvider({ children }) {
         isAdmin,
         signup,
         login,
+        googleLogin,
         adminLogin,
         logout,
       }}

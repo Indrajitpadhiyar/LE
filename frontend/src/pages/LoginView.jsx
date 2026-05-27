@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useShop } from '../context/ShopContext';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -6,8 +6,8 @@ import { Mail, Lock, Eye, EyeOff, Loader2, Zap, ShieldCheck, User, ArrowLeft, Ch
 // import electricBg from '../assets/electric_login_bg.png';
 
 export default function LoginView() {
-  const { login, signup } = useAuth();
-  const { activeView, navigateTo, addToast } = useShop();
+  const { login, signup, googleLogin } = useAuth();
+  const { activeView, navigateTo, addToast, handlePostLoginRedirect } = useShop();
 
   const isLogin = activeView === 'login';
 
@@ -67,7 +67,7 @@ export default function LoginView() {
     try {
       await login(email, password);
       addToast('Welcome back! Login successful 🎉', 'success');
-      navigateTo('home');
+      handlePostLoginRedirect();
     } catch (err) {
       const msg = err.response?.data?.message || 'Login failed. Please try again.';
       addToast(msg, 'error');
@@ -85,7 +85,7 @@ export default function LoginView() {
     try {
       await signup(name, email, password);
       addToast('Account created successfully! Welcome aboard 🎉', 'success');
-      navigateTo('home');
+      handlePostLoginRedirect();
     } catch (err) {
       const msg = err.response?.data?.message || 'Signup failed. Please try again.';
       addToast(msg, 'error');
@@ -104,9 +104,65 @@ export default function LoginView() {
     navigateTo(view);
   };
 
-  const handleGoogleLogin = () => {
-    addToast('Google login is in demo mode. Please use email/password credentials.', 'info');
+  // Handle Google Login Credential Response
+  const handleCredentialResponse = async (response) => {
+    setIsLoading(true);
+    try {
+      await googleLogin(response.credential);
+      addToast('Welcome back! Logged in with Google successfully 🎉', 'success');
+      handlePostLoginRedirect();
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Google Login failed. Please try again.';
+      addToast(msg, 'error');
+      setErrors({ form: msg });
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  // Dynamically load Google GIS script and initialize
+  useEffect(() => {
+    const initializeGoogle = () => {
+      if (window.google) {
+        window.google.accounts.id.initialize({
+          client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+          callback: handleCredentialResponse,
+        });
+
+        const btnEl = document.getElementById("google-signin-btn");
+        if (btnEl) {
+          window.google.accounts.id.renderButton(
+            btnEl,
+            { 
+              theme: "outline", 
+              size: "large", 
+              width: "380", 
+              shape: "rectangular", 
+              text: "continue_with" 
+            }
+          );
+        }
+        
+        // Trigger one tap prompt as a premium feature!
+        window.google.accounts.id.prompt();
+      }
+    };
+
+    // Load GIS script if not present
+    if (!document.getElementById("google-gis-script")) {
+      const script = document.createElement("script");
+      script.id = "google-gis-script";
+      script.src = "https://accounts.google.com/gsi/client";
+      script.async = true;
+      script.defer = true;
+      script.onload = initializeGoogle;
+      document.head.appendChild(script);
+    } else {
+      // Small timeout to ensure the DOM element #google-signin-btn has rendered
+      const timer = setTimeout(initializeGoogle, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isLogin]);
 
   return (
     <div className="min-h-screen flex bg-slate-50 overflow-hidden font-sans">
@@ -499,23 +555,10 @@ export default function LoginView() {
             </div>
 
             {/* Google Login Button */}
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              type="button"
-              onClick={handleGoogleLogin}
-              className="w-full py-3 rounded-2xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 hover:border-slate-300 font-semibold text-sm shadow-sm transition-all duration-200 flex items-center justify-center gap-3 cursor-pointer"
-            >
-              <svg className="w-5 h-5" viewBox="0 0 24 24" width="24" height="24" xmlns="http://www.w3.org/2000/svg">
-                <g transform="matrix(1, 0, 0, 1, 0, 0)">
-                  <path d="M21.35,11.1H12v2.7h5.38c-0.24,1.28 -0.96,2.37 -2.04,3.1v2.58h3.3c1.93,-1.78 3.04,-4.4 3.04,-7.47c0,-0.64 -0.06,-1.27 -0.17,-1.82z" fill="#4285F4" />
-                  <path d="M12,20.62c2.43,0 4.47,-0.8 5.96,-2.19l-3.3,-2.58c-0.9,0.6 -2.07,0.97 -3.3,0.97c-2.33,0 -4.31,-1.57 -5.02,-3.69h-3.41v2.64c1.5,2.97 4.56,5.01 8.13,5.01z" fill="#34A853" />
-                  <path d="M6.98,13.13c-0.18,-0.54 -0.28,-1.11 -0.28,-1.7c0,-0.59 0.1,-1.16 0.28,-1.7v-2.64h-3.41c-0.6,1.2 -0.94,2.56 -0.94,4c0,1.44 0.34,2.8 0.94,4l3.41,-2.66z" fill="#FBBC05" />
-                  <path d="M12,6.38c1.32,0 2.5,0.45 3.44,1.35l2.58,-2.58c-1.56,-1.45 -3.59,-2.33 -6.02,-2.33c-3.57,0 -6.63,2.04 -8.13,5.01l3.41,2.64c0.71,-2.12 2.69,-3.69 5.02,-3.69z" fill="#EA4335" />
-                </g>
-              </svg>
-              <span>Sign in with Google</span>
-            </motion.button>
+            {/* Native Google Sign-In Button Container */}
+            <div className="flex justify-center w-full min-h-[44px]">
+              <div id="google-signin-btn" className="w-full flex justify-center" />
+            </div>
 
             {/* Admin access trigger */}
             <div className="mt-6 text-center">
